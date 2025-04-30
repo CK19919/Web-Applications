@@ -1,0 +1,186 @@
+import React, { useEffect, useState, useMemo } from 'react';
+import axios from 'axios';
+
+const POKEMON_API = 'https://pokeapi.co/api/v2/pokemon?limit=150';
+
+const App = () => {
+  const [pokemonList, setPokemonList] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [types, setTypes] = useState([]);
+  const [selectedType, setSelectedType] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchPokemon = async () => {
+      try {
+        const res = await axios.get(POKEMON_API);
+        const pokemonData = await Promise.all(
+          res.data.results.map(async (pokemon) => {
+            const pokeDetails = await axios.get(pokemon.url);
+            return {
+              id: pokeDetails.data.id,
+              name: pokeDetails.data.name,
+              image: pokeDetails.data.sprites.front_default,
+              types: pokeDetails.data.types.map((t) => t.type.name),
+            };
+          })
+        );
+        setPokemonList(pokemonData);
+        const allTypes = new Set(pokemonData.flatMap((p) => p.types));
+        setTypes([...allTypes].sort());
+      } catch (err) {
+        setError('Failed to fetch Pokémon data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPokemon();
+  }, []);
+
+  const filteredPokemon = useMemo(() => {
+    return pokemonList.filter((p) => {
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = selectedType ? p.types.includes(selectedType) : true;
+      return matchesSearch && matchesType;
+    });
+  }, [searchTerm, selectedType, pokemonList]);
+
+  return (
+    <div style={styles.appContainer}>
+      <header style={styles.header}>
+        <h1 style={styles.title}>PokéSearch</h1>
+      </header>
+
+      <div style={styles.filters}>
+        <input
+          type="text"
+          style={styles.input}
+          placeholder="Search Pokémon..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        <select
+          style={styles.select}
+          value={selectedType}
+          onChange={(e) => setSelectedType(e.target.value)}
+        >
+          <option value="">All Types</option>
+          {types.map((type) => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </select>
+      </div>
+
+      {loading && <p style={styles.message}>Loading Pokémon...</p>}
+      {error && <p style={{ ...styles.message, color: 'red' }}>{error}</p>}
+
+      {!loading && !error && (
+        <div style={styles.grid}>
+          {filteredPokemon.length > 0 ? (
+            filteredPokemon.map((pokemon) => (
+              <div key={pokemon.id} style={styles.card}>
+                <img src={pokemon.image} alt={pokemon.name} style={styles.image} />
+                <h3 style={styles.pokemonName}>#{pokemon.id} {pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1)}</h3>
+                <div style={styles.types}>
+                  {pokemon.types.map((type) => (
+                    <span key={type} style={styles.typeBadge}>{type}</span>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p style={styles.message}>No Pokémon match your search.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const styles = {
+  appContainer: {
+    minHeight: '100vh',
+    padding: '1rem',
+    background: 'linear-gradient(to bottom right, #ebf4ff, #c3dafe)'
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: '1.5rem'
+  },
+  title: {
+    fontSize: '2.5rem',
+    fontWeight: 'bold',
+    color: '#4c51bf',
+    textShadow: '1px 1px 2px rgba(0,0,0,0.1)'
+  },
+  filters: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '1rem',
+    marginBottom: '2rem'
+  },
+  input: {
+    padding: '0.5rem 1rem',
+    width: '100%',
+    maxWidth: '16rem',
+    borderRadius: '0.5rem',
+    border: '1px solid #cbd5e0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+  },
+  select: {
+    padding: '0.5rem 1rem',
+    width: '100%',
+    maxWidth: '16rem',
+    borderRadius: '0.5rem',
+    border: '1px solid #cbd5e0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+  },
+  message: {
+    textAlign: 'center',
+    fontSize: '1.125rem',
+    color: '#4a5568'
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+    gap: '1.5rem'
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    padding: '1rem',
+    borderRadius: '1rem',
+    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+    textAlign: 'center',
+    transition: 'transform 0.2s ease-in-out'
+  },
+  image: {
+    width: '96px',
+    height: '96px',
+    objectFit: 'contain',
+    marginBottom: '0.5rem'
+  },
+  pokemonName: {
+    fontSize: '1.25rem',
+    fontWeight: '600',
+    color: '#5a67d8'
+  },
+  types: {
+    display: 'flex',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: '0.5rem',
+    marginTop: '0.5rem'
+  },
+  typeBadge: {
+    backgroundColor: '#ebf4ff',
+    color: '#4c51bf',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '9999px',
+    fontSize: '0.875rem',
+    textTransform: 'capitalize'
+  }
+};
+
+export default App;
